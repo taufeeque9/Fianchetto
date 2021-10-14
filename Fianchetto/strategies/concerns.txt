@@ -1,0 +1,8 @@
+1) While sampling sample_size boards from board_set, returned list has length sample_size + len(cache)
+   Time for moves didn't consider additional cache though.
+2) Boards are samples uniformly from board_set. Should sample boards using beliefs of board being true board.
+3) Weighted avg way of scoring move doesn't make sense. Why is the weight for boards computed using the strength of
+   the board? -- That board is given more weight which has higher opponent score
+4) Makes sense why max has a weight of 0.
+
+147-150 def weight_board_probability(score):

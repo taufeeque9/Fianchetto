@@ -1,0 +1,1 @@
+from .FianchettoBot import FianchettoBot
