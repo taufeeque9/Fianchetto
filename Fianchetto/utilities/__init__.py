@@ -47,7 +47,7 @@ def generate_moves_without_opponent_pieces(board: chess.Board) -> Iterable[chess
 def simulate_sense(board, square):  # copied (with modifications) from LocalGame
     if square is None:
         # don't sense anything
-        sense_result = []
+        sense_result = ()
     else:
         if square not in list(chess.SQUARES):
             raise ValueError('LocalGame::sense({}): {} is not a valid square.'.format(square, square))
@@ -60,6 +60,11 @@ def simulate_sense(board, square):  # copied (with modifications) from LocalGame
                     sense_result.append((sense_square, board.piece_at(sense_square)))
     return tuple(sense_result)
 
+# Produce a sense result from a hypothetical true board and a sense square
+def simulate_sense_prime(board, square):  # copied (with modifications) from LocalGame
+    rank, file = chess.square_rank(square), chess.square_file(square)
+    sense_result = [board.piece_at(chess.square(file + delta_file, rank + delta_rank)) for delta_file, delta_rank in [(1, -1), (1, 0), (1, 1), (0, -1), (0, 0), (0, 1), (-1, -1), (-1, 0), (-1, 1)]]
+    return tuple(sense_result)
 
 # test an attempted move on a board to see what move is actually taken
 def simulate_move(board, move):
@@ -139,7 +144,7 @@ def move_would_happen_on_board(requested_move, taken_move, captured_opponent_pie
 def push_move_to_epd(epd, move):
     board = chess.Board(epd)
     board.push(move)
-    return board.epd()
+    return board.epd(en_passant='xfen')
 
 
 # Generate tuples of next turn's boards and capture squares for one current board

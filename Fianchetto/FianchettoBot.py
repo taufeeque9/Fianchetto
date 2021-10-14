@@ -48,7 +48,7 @@ class FianchettoBot(Player):
         populate_next_board_set: Optional[Callable] = defaults.populate_next_board_set,
         # get_next_boards_and_capture_squares: Optional[Callable] = defaults.get_next_boards_and_capture_squares,
 
-        # pool_size: Optional[int] = 1,
+        pool_size: Optional[int] = 6,
         log_to_file=True,
         save_debug_history=False,
         rc_disable_pbar=RC_DISABLE_PBAR,
@@ -81,7 +81,7 @@ class FianchettoBot(Player):
         self.color = None
         self.turn_num = None
 
-        # self.pool = mp.Pool(pool_size)
+        self.pool = mp.Pool(pool_size)
 
         self.save_debug_history = save_debug_history
         self.debug_memory = []
@@ -205,8 +205,11 @@ class FianchettoBot(Player):
             desc=f'{chess.COLOR_NAMES[self.color]} Filtering {len(self.boards)} boards by sense results',
             unit='boards',
         )
+        # self.boards = {board_epd: prob for board_epd, prob in
+        #                map(partial(board_matches_sense, sense_result=sense_result), i)
+        #                if board_epd is not None}
         self.boards = {board_epd: prob for board_epd, prob in
-                       map(partial(board_matches_sense, sense_result=sense_result), i)
+                       self.pool.imap_unordered(partial(board_matches_sense, sense_result=sense_result), i)
                        if board_epd is not None}
 
         total_prob = sum(self.boards.values())
@@ -260,7 +263,9 @@ class FianchettoBot(Player):
         # boards_before = copy.deepcopy(self.boards)
         self.boards = {
             board_epd: prob for board_epd, prob in
-            map(partial(move_would_happen_on_board, requested_move, taken_move,
+            # map(partial(move_would_happen_on_board, requested_move, taken_move,
+            #                                  captured_opponent_piece, capture_square), i)
+            self.pool.imap_unordered(partial(move_would_happen_on_board, requested_move, taken_move,
                                              captured_opponent_piece, capture_square), i)
             if board_epd is not None
         }
@@ -315,5 +320,5 @@ class FianchettoBot(Player):
                         ):
         self.logger.info('I %s by %s', "won" if winner_color == self.color else "lost",
                          win_reason.name if hasattr(win_reason, "name") else win_reason)
-        # self.pool.terminate()
+        self.pool.terminate()
         self._end_game()

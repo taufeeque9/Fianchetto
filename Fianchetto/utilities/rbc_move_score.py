@@ -131,7 +131,7 @@ def calculate_score(b,
             raw_scores_rbc = [0]*len(moves)
             raw_scores_rbc[moves.index(chess.Move.null())] = 10
             results[board_epd] = (q, raw_scores_rbc, moves)
-            # score_cache[board_epd] = (q, raw_scores_rbc, moves)
+            score_cache[board_epd] = (q, raw_scores_rbc, moves)
             continue
 
         raw_scores_rbc = [-2*abs(least_score)]*len(moves)
@@ -234,6 +234,6 @@ def calculate_score(b,
 
 
         results[board_epd] = (q, raw_scores_rbc, moves)
-        # score_cache[board_epd] = (q, raw_scores_rbc, moves)
+        score_cache[board_epd] = (q, raw_scores_rbc, moves)
 
     return results, cached_asked_moves

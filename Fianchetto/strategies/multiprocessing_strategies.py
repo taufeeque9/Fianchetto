@@ -12,7 +12,7 @@ import numpy as np
 from reconchess import Square
 from tqdm import tqdm
 
-from Fianchetto.utilities import SEARCH_SPOTS, stockfish, simulate_move, simulate_sense, \
+from Fianchetto.utilities import SEARCH_SPOTS, stockfish, simulate_move, simulate_sense, simulate_sense_prime, \
     generate_rbc_moves, generate_moves_without_opponent_pieces as all_rbc_moves, force_promotion_to_queen, capture_square_of_move
 from Fianchetto.utilities.rbc_move_score import calculate_score, ScoreConfig, softmax
 from Fianchetto.utilities.player_logging import create_sub_logger
@@ -46,9 +46,9 @@ class TimeConfig:
     min_time_for_turn: float = 1.0  # minimum time to allocate for a turn
     time_for_sense: float = 0.8  # fraction of turn spent in choose_sense
     time_for_move: float = 0.2  # fraction of turn spent in choose_move
-    max_batch: int = 256
-    num_boards_per_sec: int = 1000 #per process
-    calc_time_per_eval: float = max_batch*(1/num_boards_per_sec)  # starting time estimate for move score calculation
+    max_batch: int = 1024
+    num_boards_per_sec: int = 5000 #per process
+    calc_time_per_board: float = (1/num_boards_per_sec)  # starting time estimate for move score calculation
     board_limit_for_belief: int = num_boards_per_sec*20
 
 
@@ -59,14 +59,9 @@ chess.Board.__hash__ = lambda self: hash(self.epd(en_passant='xfen'))
 
 
 # Create a cache key for the requested board and move (keyed based on the move that would result from that request)
-def make_cache_key(board, color=None):
-    if color and type(board) == str:
-        board = chess.Board(board)
-    elif type(board) == str:
+def make_cache_key(board):
+    if type(board) == str:
         return board
-
-    if color:
-        board.turn = color
     return board.epd(en_passant='xfen')
 
 
@@ -109,6 +104,7 @@ def make_cache_key(board, color=None):
 
 
 def create_strategy(
+        gpu_id: int = 0,
         move_config: MoveConfig = MoveConfig(),
         score_config: ScoreConfig = ScoreConfig(),
         time_config: TimeConfig = TimeConfig(),
@@ -164,12 +160,12 @@ def create_strategy(
 
     # Initialize a list to store calculation time data for dynamic time management
     score_calc_times = []
-    bkd = stockfish.create_engine(time_config.max_batch)
+    bkd = stockfish.create_engine(time_config.max_batch, gpu_id)
 
     # Estimate calculation time based on data stored so far this game (and a provided starting datum)
     def calc_time_per_eval() -> float:
         n0 = 1
-        t0 = time_config.calc_time_per_eval * n0
+        t0 = time_config.calc_time_per_board * n0
         # total_num = n0 + sum(n for n, t in score_calc_times)
         total_num = n0 + len(score_calc_times)
         total_time = t0 + sum(score_calc_times)
@@ -232,7 +228,7 @@ def create_strategy(
                 # print(m)
                 mapping = {i:m.index(simulate_move(chess.Board(board_epd), move) or chess.Move.null()) for i, move in enumerate(asked_moves)}
                 # p = [p[mapping[i]] for i in range(len(p))]
-                s = [s[mapping[i]] for i in range(len(s))]
+                s = [s[mapping[i]] for i in range(len(asked_moves))]
 
                 final_results[board_epd] = (q, s)
             else:
@@ -382,6 +378,11 @@ def create_strategy(
         king is in check on all possible boards.
         """
         # print(colored(f'board set size: {len(board_set)}', 'red'))
+        t0 = time()
+        global msr
+        global move_ind
+        global store
+        move_ind += 1
         global msi, esr
         # print('movelist')
         # print(moves)
@@ -407,7 +408,7 @@ def create_strategy(
         weighted_probability = defaultdict(lambda: defaultdict(float))
         total_weighted_probability = 0
         sense_results = defaultdict(lambda: defaultdict(set))
-        sense_possibilities = defaultdict(set)
+        sense_possibilities = defaultdict(lambda: defaultdict(set))
         king_locations = defaultdict(lambda: defaultdict(set))
 
         # Get a random sampling of boards from the board set
@@ -419,6 +420,7 @@ def create_strategy(
         logger.debug('Sampled %d boards out of %d for sensing.', len(board_sample), len(board_set))
 
         # Get board position strengths before move for all boards in sample (to take advantage of parallel processing)
+        bst = time()-t0
         board_score_reqs = []
         for board_epd in board_sample:
             board = chess.Board(board_epd)
@@ -436,7 +438,7 @@ def create_strategy(
         total_king_squares = 0
 ###################################################################################################################
         # board_sample_weights = softmax([-(board_score_dict[make_cache_key(board)][0]) for board in board_sample])
-
+        bet = time()-t0
         for num_board, (board_epd, board_prob) in enumerate(tqdm(board_sample.items(), disable=rc_disable_pbar,
                                                    desc=f'{chess.COLOR_NAMES[our_color]} '
                                                         'Calculating choose_sense scores '
@@ -444,6 +446,7 @@ def create_strategy(
                                                    unit='boards')):
             board = chess.Board(board_epd)
             board.turn = our_color
+            board_epd_p = make_cache_key(board)
 ###################################################################################################################
             opp_queen=board.pieces(chess.QUEEN, not our_color)
             for square in opp_queen:
@@ -461,14 +464,14 @@ def create_strategy(
                 total_king_squares+=1
 ###################################################################################################################
             # print('results:', board_score_dict[make_cache_key(board)])
-            my_score, all_moves_score = board_score_dict[make_cache_key(board)]
+            my_score, all_moves_score = board_score_dict[board_epd_p]
             # op_score = -my_score #assumption
             # board_sample_weights[num_board] = weight_board_probability(op_score)
             board_sample_weights[num_board] = board_prob
             total_weighted_probability += board_sample_weights[num_board]
 
             # board.turn = our_color
-            boards_in_cache.add(board.epd(en_passant='xfen'))  # Record that this board (and all moves) are in our cache
+            boards_in_cache.add(board_epd_p)  # Record that this board (and all moves) are in our cache
 
             # move_score_dict = get_move_prob(board, moves)  # Score all moves
 
@@ -477,11 +480,12 @@ def create_strategy(
 
             # Gather information about sense results for each square on each board (and king locations)
             for square in SEARCH_SPOTS:
-                sense_result = simulate_sense(board, square)
+                sense_result = simulate_sense_prime(board, square)
+                # sense_result = simulate_sense(board, square)
                 num_occurances[square][sense_result] += 1
                 weighted_probability[square][sense_result] += board_sample_weights[num_board]
-                sense_results[board_epd][square] = sense_result
-                sense_possibilities[square].add(sense_result)
+                # sense_results[board_epd][square] = sense_result
+                sense_possibilities[square][sense_result].add(num_board)
                 king_locations[square][sense_result].add(board.king(not our_color))
 
         # Take a different strategy if we are sure they are in checkmate (the usual board weight math fails there)
@@ -508,8 +512,9 @@ def create_strategy(
             possible_results = sense_possibilities[square]
             for sense_result in possible_results:
                 if len(possible_results) > 1:
-                    subset_index = [i for i, board_epd in enumerate(board_sample)
-                                    if sense_result == sense_results[board_epd][square]]
+                    # subset_index = [i for i, board_epd in enumerate(board_sample)
+                    #                 if sense_result == sense_results[board_epd][square]]
+                    subset_index = list(possible_results[sense_result])
                     subset_move_scores = move_scores[:, subset_index]
                     subset_board_weights = board_sample_weights[subset_index]
 
@@ -560,7 +565,7 @@ def create_strategy(
                     majority_square+=8
                 if (chess.square_rank(majority_square)==7):
                     majority_square-=8
-                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),50)-(mean_sense_impact[majority_square])))*(8/10))
+                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
 ###################################################################################################################
         majority_count=0
@@ -579,7 +584,7 @@ def create_strategy(
                     majority_square+=8
                 if (chess.square_rank(majority_square)==7):
                     majority_square-=8
-                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),50)-(mean_sense_impact[majority_square])))*(8/10))
+                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
         # Also calculate the expected board set reduction for each sense square (scale from board sample to full set)
         expected_set_reduction = {
@@ -604,7 +609,11 @@ def create_strategy(
         sense_choice = random.choice([square for square, score in sense_score.items()
                                       if abs(score - max_sense_score) < SCORE_ROUNDOFF])
 
+
         print(f'got sense choice {sense_choice}')
+        ft = time()-t0
+        with open('/home/rbc/reconchess/Fianchetto/timelog.txt', 'a') as f:
+            f.write(f'bst={bst}, bet={bet}, ft={ft} | turn={move_ind} on sense\n')
         return sense_choice
 
     def move_strategy(board_set: DefaultDict[str, float], our_color: bool,
@@ -623,10 +632,11 @@ def create_strategy(
         """
         # print(colored(f'board set size: {len(board_set)}', 'red'))
         # sleep(10)
+        t0 = time()
         global msr
         global move_ind
         global store
-        move_ind += 1
+        # move_ind += 1
         store.append({})
         # Allocate remaining time and use that to determine the sample_size for this turn
         time_for_turn = allocate_time(seconds_left, fraction_turn_passed=1-time_config.time_for_move)
@@ -654,6 +664,8 @@ def create_strategy(
         board_sample = cache_favored_random_sample(board_set, sample_size)
         print('Sampled %d boards out of %d for moving.', len(board_sample), len(board_set))
 
+        bst = time()-t0
+
         # Get board position strengths before move for all boards in sample (to take advantage of parallel processing)
         board_score_reqs = []
         for board_epd in board_sample:
@@ -675,7 +687,9 @@ def create_strategy(
         #     else:
         #         return -(board_score_dict[make_cache_key(board)][0])
         # board_sample_weights = softmax([check_score_wrapper(board) for board in board_sample])
-
+        bet = time()-t0
+        move_scores = np.zeros([len(moves), len(board_sample)])
+        board_weight_arr = np.zeros(len(board_sample))
 
         for num_board, (board_epd, board_weight) in enumerate(tqdm(board_sample.items(), disable=rc_disable_pbar,
                               desc=f'{chess.COLOR_NAMES[our_color]} Calculating choose_move scores '
@@ -686,7 +700,8 @@ def create_strategy(
             my_score, all_moves_score = board_score_dict[make_cache_key(board)]
             # op_score = -my_score
             # board_weight = weight_board_probability(op_score)
-            total_weighted_probability += board_weight
+            # total_weighted_probability += board_weight
+            board_weight_arr[num_board] = board_weight
 
             # board.turn = our_color
             boards_in_cache.add(board.epd(en_passant='xfen'))  # Record that this board (and all moves) are in our cache
@@ -697,23 +712,27 @@ def create_strategy(
             # move_scores[:, num_board] = all_moves_prob
 
             # Gather scores and information about move results for each requested move on each board
-            for it, move in enumerate(moves):
-                score = all_moves_score[it]
-                move_scores[move].append(score)
-                weighted_sum_move_scores[move] += score * board_weight
+            move_scores[:, num_board] = all_moves_score
+            # for it, move in enumerate(moves):
+            #     score = all_moves_score[it]
+            #     move_scores[move].append(score)
+            #     weighted_sum_move_scores[move] += score * board_weight
 
-                sim_move = simulate_move(board, move) or chess.Move.null()
-                move_result = (sim_move, board.is_capture(sim_move))
-                move_possibilities[move].add(move_result)
-                num_occurances[move][move_result] += 1
-                weighted_probability[move][move_result] += board_weight
+                # sim_move = simulate_move(board, move) or chess.Move.null()
+                # move_result = (sim_move, board.is_capture(sim_move))
+                # move_possibilities[move].add(move_result)
+                # num_occurances[move][move_result] += 1
+                # weighted_probability[move][move_result] += board_weight
 
         # Combine the mean, min, and max possible scores based on config settings
-        compound_score = {move: (
-            weighted_sum_move_scores[move] / total_weighted_probability * move_config.mean_score_factor +
-            min(scores) * move_config.min_score_factor +
-            max(scores) * move_config.max_score_factor
-        ) for (move, scores) in move_scores.items()}
+        # compound_score = {move: (
+        #     weighted_sum_move_scores[move] / total_weighted_probability * move_config.mean_score_factor +
+        #     min(scores) * move_config.min_score_factor +
+        #     max(scores) * move_config.max_score_factor
+        # ) for (move, scores) in move_scores.items()}
+        # board_weight_arr /= np.sum(board_weight_arr)
+        compound_score = move_config.mean_score_factor * np.average(move_scores, axis=-1, weights=board_weight_arr) \
+                       + move_config.min_score_factor * np.min(move_scores, axis=-1)
 
 
         store[-1]['#boards'] = len(board_set)
@@ -733,15 +752,15 @@ def create_strategy(
         #                       for move, score in compound_score.items()}
 
         # Determine the minimum score a move needs to be considered
-        highest_score = max(compound_score.values())
+        highest_score = np.max(compound_score)
         threshold_score = highest_score - abs(highest_score) * move_config.threshold_score_factor
         # print(highest_score, threshold_score)
         # threshold_score = highest_score * move_config.threshold_score_factor
 
 
         # Create a list of all moves which scored above the threshold
-        store[-1]['compound_score'] = {k:v for k, v in compound_score.items() if v >= threshold_score}
-        move_options = [move for move, score in compound_score.items() if score >= threshold_score]
+        # store[-1]['compound_score'] = {k:v for k, v in compound_score.items() if v >= threshold_score}
+        move_options = [move for move, score in zip(moves, compound_score) if score >= threshold_score]
         # print(store[-1]['compound_score'])
         # # Eliminate move options which we know to be illegal (mainly for replay clarity)
         # move_options = [move for move in move_options
@@ -767,6 +786,9 @@ def create_strategy(
         # move_options = sorted(compound_score.items(), key=lambda x: x[1], reverse=True)[:max(1, int(len(compound_score)/10))]
         # move_options = list(zip(*move_options))
         # move_choice = random.choices(move_options[0], weights=move_options[1])[0]
+        ft = time()-t0
+        with open('/home/rbc/reconchess/Fianchetto/timelog.txt', 'a') as f:
+            f.write(f'bst={bst}, bet={bet}, ft={ft} | turn={move_ind} on move\n')
 
         return force_promotion_to_queen(move_choice) if move_config.force_promotion_queen else move_choice
 
@@ -877,7 +899,7 @@ def create_strategy(
     def get_weight_for_scoring(board_set_size):
         # weight returned should never be 1
         # return 0.5
-        param=int(board_set_size/10000)
+        param=int(board_set_size/10_000)
         if param<1:
             return 0.99999
         elif param<2:

@@ -72,11 +72,11 @@ def our_play_remote_game(server_url, game_id, auth, player: Player):
     return winner_color, win_reason, game_history
 
 
-def accept_invitation_and_play(server_url, auth, invitation_id, finished):
+def accept_invitation_and_play(server_url, auth, invitation_id, finished, gpu_id):
     # make sure this process doesn't react to the first interrupt signal
     signal.signal(signal.SIGINT, ignore_one_term)
 
-    player = get_player_from_config()
+    player = get_player_from_config(gpu_id)
     logger = create_sub_logger('invitations')
 
     logger.debug('Accepting invitation %d.', invitation_id)
@@ -106,6 +106,8 @@ def listen_for_invitations(server, max_concurrent_games):
     connected = False
     process_by_invitation = {}
     finished_by_invitation = {}
+    curr_gpu = 0
+
     while True:
         try:
             # get unaccepted invitations
@@ -139,8 +141,9 @@ def listen_for_invitations(server, max_concurrent_games):
                         finished = multiprocessing.Value('b', False)
                         process = multiprocessing.Process(
                             target=accept_invitation_and_play,
-                            args=(server.server_url, server.session.auth, invitation, finished))
+                            args=(server.server_url, server.session.auth, invitation, finished, curr_gpu))
                         process.start()
+                        curr_gpu ^= 1
 
                         # store the process so we can check when it finishes
                         process_by_invitation[invitation] = process
@@ -161,7 +164,7 @@ def listen_for_invitations(server, max_concurrent_games):
         time.sleep(5)
 
 
-def get_player_from_config():
+def get_player_from_config(gpu_id):
     create_main_logger(log_to_file=True)
     logger = create_sub_logger('config_loading')
     file_loaded = False
@@ -170,14 +173,14 @@ def get_player_from_config():
         try:
             # with open('config.yml') as f:
             #     config = yaml.load(f, Loader=yaml.FullLoader)
-            player = player_configuration(config=None)
+            player = player_configuration(config=None, gpu_id=gpu_id)
             file_loaded = True
         except Exception:
             logger.exception("Something went wrong loading config.yaml. Attempting to load backup_config.yaml next.")
             try:
                 # with open('backup_config.yml') as f:
                 #     config = yaml.load(f, Loader=yaml.FullLoader)
-                player = player_configuration(config=None)
+                player = player_configuration(config=None, gpu_id=gpu_id)
                 file_loaded = True
             except Exception:
                 logger.exception("Also failed to load backup_config.yaml. Repeating loading loop.")
@@ -186,7 +189,7 @@ def get_player_from_config():
     return player
 
 
-def player_configuration(config):
+def player_configuration(config, gpu_id):
     # logger = create_sub_logger('config_loading')
 
 #    strategy_config = config.pop('multiprocessing_strategies')
@@ -194,12 +197,13 @@ def player_configuration(config):
 #    move_config = MoveConfig(**strategy_config.pop('move_config'))
 #    time_config = TimeConfig(**strategy_config.pop('time_config'))
     strategy = multiprocessing_strategies.create_strategy(
+        gpu_id
 #        **strategy_config,
 #        score_config=score_config,
 #        move_config=move_config,
 #        time_config=time_config,
     )
-    strangefish = FianchettoBot(*strategy)
+    Fian = FianchettoBot(*strategy)
 
     # logger.debug(
     #     "Created a StrangeFish player using multiprocessing_strategies with the following configuration: "
@@ -210,7 +214,7 @@ def player_configuration(config):
     #     f"other player arguments = {config}, "
     # )
 
-    return strangefish
+    return Fian
 
 
 @click.command()
