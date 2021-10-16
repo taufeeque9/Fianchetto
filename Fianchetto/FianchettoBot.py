@@ -1,4 +1,4 @@
-# import multiprocessing as mp
+import multiprocessing as mp
 import os
 from termcolor import colored
 from collections import defaultdict
@@ -47,7 +47,7 @@ class FianchettoBot(Player):
         end_game: Optional[Callable[[DefaultDict[str, float]], None]] = defaults.end_game,
         populate_next_board_set: Optional[Callable] = defaults.populate_next_board_set,
         # get_next_boards_and_capture_squares: Optional[Callable] = defaults.get_next_boards_and_capture_squares,
-
+        batch_size: Optional[int] = 1024,
         pool_size: Optional[int] = 6,
         log_to_file=True,
         save_debug_history=False,
@@ -72,6 +72,7 @@ class FianchettoBot(Player):
         self._while_we_wait = while_we_wait
         self._end_game = end_game
         self._populate_next_board_set = populate_next_board_set
+        self.batch_size = batch_size
         # self._get_next_boards_and_capture_squares = get_next_boards_and_capture_squares
 
         self.boards: DefaultDict[float] = defaultdict(float)
@@ -158,7 +159,7 @@ class FianchettoBot(Player):
         # If creation of new board set didn't complete during op's turn (self.boards will not be empty)
         if self.boards:
             new_board_set = self._populate_next_board_set(self.boards, self.color,
-                                                    rc_disable_pbar=self.rc_disable_pbar)
+                                                    rc_disable_pbar=self.rc_disable_pbar, pool=self.pool)
             for square in new_board_set.keys():
                 self.next_turn_boards[square] = union_dict(self.next_turn_boards[square], new_board_set[square])
 
@@ -189,7 +190,7 @@ class FianchettoBot(Player):
 
         with Timer(self.logger.debug, 'choosing sense location'):
             # Pass the needed information to the decision-making function to choose a sense square
-            sense_choice = self._choose_sense(self.boards, self.color, sense_actions, move_actions, seconds_left)
+            sense_choice = self._choose_sense(self.boards, self.color, sense_actions, move_actions, seconds_left, self.pool)
 
         self.logger.debug('Chose to sense %s', chess.SQUARE_NAMES[sense_choice] if sense_choice else 'nowhere')
 
@@ -232,7 +233,7 @@ class FianchettoBot(Player):
 
         with Timer(self.logger.debug, 'choosing move'):
             # Pass the needed information to the decision-making function to choose a move
-            move_choice = self._choose_move(self.boards, self.color, move_actions, seconds_left)
+            move_choice = self._choose_move(self.boards, self.color, move_actions, seconds_left, self.pool)
 
         self.logger.debug('The chosen move was %s', move_choice)
 
@@ -303,10 +304,12 @@ class FianchettoBot(Player):
 
             # If there are still boards in the set from last turn, remove one and expand it by all possible moves
             if len(self.boards):
-                board, prob = '', 0
-                while prob == 0:
+                popped_boards = {}
+                while len(self.boards) and len(popped_boards) < self.batch_size:
                     board, prob = self.boards.popitem()
-                new_board_set = self._populate_next_board_set({board: prob}, self.color, rc_disable_pbar=True)
+                    if prob > 0:
+                        popped_boards[board] = prob
+                new_board_set = self._populate_next_board_set(popped_boards, self.color, rc_disable_pbar=True, pool=self.pool)
                 for square in new_board_set.keys():
                     self.next_turn_boards[square] = union_dict(self.next_turn_boards[square], new_board_set[square])
                     if square != our_king_square:

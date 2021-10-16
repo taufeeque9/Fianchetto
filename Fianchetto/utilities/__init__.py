@@ -8,7 +8,8 @@ import chess
 
 from reconchess.utilities import without_opponent_pieces, is_illegal_castle, is_psuedo_legal_castle, slide_move, \
     moves_without_opponent_pieces, pawn_capture_moves_on, capture_square_of_move
-
+from scipy.special import softmax, expit
+import numpy as np
 # These are the possible squares to search–all squares that aren't on the edge of the board.
 SEARCH_SPOTS = [
     9, 10, 11, 12, 13, 14,
@@ -162,6 +163,47 @@ def push_move_to_epd(epd, move):
 #         next_epd = next_board.fen()
 #         pairs.append((capture_square, next_epd))
 #     return pairs
+
+def get_next_boards_and_capture_squares(w, all_b_m_len, board_epd_moves_prob_score):
+    board_epd, moves, prob, score = board_epd_moves_prob_score
+    board = chess.Board(board_epd)
+    # prob = board_set[all_boards[i][0]]  # accessing prob requires epd from our color's pov
+
+
+    if w != 0:
+        (_, all_moves_score) = score # accessing scores requires epd from opponent color's pov
+        all_moves_prob = softmax(all_moves_score)
+    else:
+        all_moves_prob = 0
+
+    unif_probs = np.ones(len(moves))/len(moves)
+    for i, move in enumerate(moves):
+        next_board = board.copy()
+        next_board.push(move)
+        if next_board.was_into_check():
+            unif_probs[i] = 1e-4
+
+    unif_probs[-1] += 0.5*expit((all_b_m_len-4500)/700)
+    unif_probs /= np.sum(unif_probs)
+
+
+    weighted_moves_score = w*np.asarray(all_moves_prob) + (1-w)*unif_probs
+
+    pairs = []
+    for i, move in enumerate(moves):
+        if weighted_moves_score[i] > 0:
+            next_board = board.copy()
+            next_board.push(move)
+            capture_square = capture_square_of_move(board, move)
+            next_epd = next_board.epd(en_passant='xfen')
+            pairs.append((capture_square, next_epd, prob*(weighted_moves_score[i])))
+            # next_turn_boards[capture_square][next_epd] += prob*(weighted_moves_score[i])
+        else:
+            print('prob got zero')
+            print(board_epd)
+            print(move)
+
+    return pairs
 
 
 # Change any promotion moves to choose queen
