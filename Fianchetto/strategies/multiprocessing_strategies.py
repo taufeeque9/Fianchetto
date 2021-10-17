@@ -42,12 +42,12 @@ class MoveConfig:
 
 @dataclass
 class TimeConfig:
-    turns_to_plan_for: int = 30  # fixed number of turns over which the remaining time will be divided
+    turns_to_plan_for: int = 20  # fixed number of turns over which the remaining time will be divided
     min_time_for_turn: float = 1.0  # minimum time to allocate for a turn
     time_for_sense: float = 0.8  # fraction of turn spent in choose_sense
     time_for_move: float = 0.2  # fraction of turn spent in choose_move
     max_batch: int = 1024
-    num_boards_per_sec: int = 800 #per process
+    num_boards_per_sec: int = 1600 #per process
     calc_time_per_board: float = (2/num_boards_per_sec)  # starting time estimate for move score calculation
     board_limit_for_belief: int = num_boards_per_sec*20
 
@@ -946,14 +946,15 @@ def create_strategy(
         # if param<4:
         #     return 0.99
         if param<5:
-            return 0.9
-        elif param<20:
-            return 0.5
+            return 0.6
+        elif param<15:
+            return 0.4
         else:
             return 0
 
     # Generate tuples of next turn's boards and capture squares for one current board
     def populate_next_board_set(board_set: DefaultDict[str, float], my_color, pool=None, rc_disable_pbar: bool = False):
+        t0=time()
         next_turn_boards = defaultdict(lambda: defaultdict(float))
         all_boards = []
         flag=0
@@ -992,6 +993,7 @@ def create_strategy(
             for capture_square, next_epd, prob in pairs:
                 next_turn_boards[capture_square][next_epd] += prob
 
+        logger.debug(f'Pop next board set speed = {len(board_set)/(time()-t0)} boards/s')
         return next_turn_boards
 
 
