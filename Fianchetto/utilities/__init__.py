@@ -189,6 +189,7 @@ def get_next_boards_and_capture_squares(w, all_b_m_len, board_epd_moves_prob_sco
 
     weighted_moves_score = w*np.asarray(all_moves_prob) + (1-w)*unif_probs
 
+
     pairs = []
     for i, move in enumerate(moves):
         if weighted_moves_score[i] > 0:

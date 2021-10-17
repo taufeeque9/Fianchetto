@@ -165,6 +165,8 @@ class FianchettoBot(Player):
 
         # Get this turn's board set from a dictionary keyed by the possible capture squares
         self.boards = self.next_turn_boards[capture_square]
+        total_prob = sum(self.boards.values())
+        self.boards = {board_epd: prob/total_prob for board_epd, prob in self.boards.items()}
 
         self.logger.debug('Finished expanding and filtering the set of possible board states. '
                           'There are %d possible boards at the start of our turn %d.',

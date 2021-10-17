@@ -991,6 +991,7 @@ def create_strategy(
         for pairs in all_pairs:
             for capture_square, next_epd, prob in pairs:
                 next_turn_boards[capture_square][next_epd] += prob
+
         return next_turn_boards
 
 
