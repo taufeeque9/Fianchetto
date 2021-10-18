@@ -16,7 +16,9 @@ from Fianchetto.strategies import multiprocessing_strategies
 from Fianchetto.strategies.multiprocessing_strategies import MoveConfig, TimeConfig, ScoreConfig
 from Fianchetto.utilities import ignore_one_term
 from Fianchetto.utilities.player_logging import create_main_logger, create_sub_logger
+import GPUtil
 
+num_gpus = len(GPUtil.getAvailable(limit=3000))
 
 class OurRemoteGame(RemoteGame):
 
@@ -100,13 +102,15 @@ def accept_invitation_and_play(server_url, auth, invitation_id, finished, gpu_id
 
 
 def listen_for_invitations(server, max_concurrent_games):
-
+    global num_gpus
+    print('Num GPUS:', num_gpus)
     logger = create_sub_logger('server_manager')
 
     connected = False
     process_by_invitation = {}
     finished_by_invitation = {}
-    curr_gpu = 0
+    gpu_id_by_invitation = {}
+    gpu_count = [0]*num_gpus
 
     while True:
         try:
@@ -127,8 +131,10 @@ def listen_for_invitations(server, max_concurrent_games):
             for invitation in finished_invitations:
                 logger.info(f'Terminating process for invitation {invitation}')
                 process_by_invitation[invitation].terminate()
+                gpu_count[gpu_id_by_invitation[invitation]] -= 1
                 del process_by_invitation[invitation]
                 del finished_by_invitation[invitation]
+                del gpu_id_by_invitation[invitation]
 
             # accept invitations until we have #max_concurrent_games processes alive
             for invitation in invitations:
@@ -139,11 +145,19 @@ def listen_for_invitations(server, max_concurrent_games):
                     if len(process_by_invitation) < max_concurrent_games:
                         # start the process for playing a game
                         finished = multiprocessing.Value('b', False)
+                        lowest_id = 0
+                        lowest_count = gpu_count[lowest_id]
+                        for gpu_id in range(len(gpu_count)):
+                            if gpu_count[gpu_id] < lowest_count:
+                                lowest_id = gpu_id
+                                lowest_count = gpu_count[gpu_id]
+
+                        gpu_id_by_invitation[invitation] = lowest_id
+                        gpu_count[lowest_id] += 1
                         process = multiprocessing.Process(
                             target=accept_invitation_and_play,
-                            args=(server.server_url, server.session.auth, invitation, finished, curr_gpu))
+                            args=(server.server_url, server.session.auth, invitation, finished, lowest_id))
                         process.start()
-                        curr_gpu ^= 1
 
                         # store the process so we can check when it finishes
                         process_by_invitation[invitation] = process

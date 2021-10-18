@@ -79,21 +79,21 @@ def helper_f(b, all_board_moves, score_cache, time_config, fian_color):
                     chess_output_dict[uneval_boards[i][0]] = (chess_output[i], uneval_boards[i][1])
                 uneval_boards = []
 
-        null_board = chess.Board(board_epd)
-        null_board.push(chess.Move.null())
-        null_board.clear_stack()
-        null_board_epd = null_board.epd(en_passant='xfen')
-        if null_board_epd in score_cache:
-            results[null_board_epd] = score_cache[null_board_epd]
-            # cached_asked_moves[null_board_epd] = list(generate_rbc_moves(null_board))
-            # cached_asked_moves[null_board_epd] = list(all_rbc_moves(null_board))
-        else:
-            uneval_boards.append((null_board_epd, None))
-            if len(uneval_boards) == time_config.max_batch:
-                chess_output = evaluate_batch(b, uneval_boards)
-                for i in range(len(uneval_boards)):
-                    chess_output_dict[uneval_boards[i][0]] = (chess_output[i], uneval_boards[i][1])
-                uneval_boards = []
+        # null_board = chess.Board(board_epd)
+        # null_board.push(chess.Move.null())
+        # null_board.clear_stack()
+        # null_board_epd = null_board.epd(en_passant='xfen')
+        # if null_board_epd in score_cache:
+        #     results[null_board_epd] = score_cache[null_board_epd]
+        #     # cached_asked_moves[null_board_epd] = list(generate_rbc_moves(null_board))
+        #     # cached_asked_moves[null_board_epd] = list(all_rbc_moves(null_board))
+        # else:
+        #     uneval_boards.append((null_board_epd, None))
+        #     if len(uneval_boards) == time_config.max_batch:
+        #         chess_output = evaluate_batch(b, uneval_boards)
+        #         for i in range(len(uneval_boards)):
+        #             chess_output_dict[uneval_boards[i][0]] = (chess_output[i], uneval_boards[i][1])
+        #         uneval_boards = []
 
     if len(uneval_boards) > 0:
         chess_output = evaluate_batch(b, uneval_boards)
