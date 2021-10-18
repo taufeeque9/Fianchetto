@@ -183,7 +183,7 @@ def get_next_boards_and_capture_squares(w, all_b_m_len, board_epd_moves_prob_sco
         if next_board.was_into_check():
             unif_probs[i] = 1e-4
 
-    unif_probs[-1] += 0.5*expit((all_b_m_len-8000)/1000)
+    unif_probs[-1] += 0.5*expit((all_b_m_len-4500)/700)
     unif_probs /= np.sum(unif_probs)
 
 

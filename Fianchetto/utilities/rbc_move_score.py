@@ -27,6 +27,7 @@ class ScoreConfig:
     reward_attacker: float = 3.0  # Bonus points if move sets up attack on enemy king
     require_sneak: bool = True  # Only reward bonus points to aggressive moves if they are sneaky (aren't captures)
     far_away_defense_score: float = 0.5 #Bonus points for protecting against check from far away with support (fads)
+    pawn_attack_score: float = 1.0
 
 def cp(Q):
     return 111.714640912 * np.tan(1.5620688421 * Q)
@@ -209,6 +210,43 @@ def calculate_board_result(time_config, fian_color, score_config, board_epd_out)
                     # our position) or there are now attackers other than the piece that moves (discovered check)
                     elif not next_board.is_capture(move) or any([square != move.to_square for square in king_attackers]):
                         raw_scores_rbc[i] -= score_config.reward_attacker/ratio  # subtract some bonus points
+
+            if board.piece_type_at(move.from_square)==chess.PAWN:
+                square_reached=move.to_square
+                if pov==chess.WHITE:
+                    if chess.square_rank(square_reached)<7:
+                        if chess.square_file(square_reached)==0:
+                            attack_square=square_reached+9
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                        elif chess.square_file(square_reached)==7:
+                            attack_square=square_reached+7
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                        else:
+                            attack_square=square_reached+9
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                            attack_square=square_reached+7
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                else:
+                    if chess.square_rank(square_reached)>0:
+                        if chess.square_file(square_reached)==0:
+                            attack_square=square_reached-7
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                        elif chess.square_file(square_reached)==7:
+                            attack_square=square_reached-9
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                        else:
+                            attack_square=square_reached-7
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
+                            attack_square=square_reached-9
+                            if board.piece_type_at(attack_square)!=None and board.piece_type_at(attack_square)!=chess.PAWN:
+                                raw_scores_rbc[i]+=score_config.pawn_attack_score
 
 
     for i, revised_move in revised.items():
