@@ -934,9 +934,10 @@ def create_strategy(
     #     return next_turn_boards
 
     def get_weight_for_scoring(board_set_size):
+        return 1
         # weight returned should never be 1
         # return 0.5
-        param=int(board_set_size/1_000)
+        # param=int(board_set_size/1_000)
         # if param<1:
         #     return 0.99999
         # elif param<2:
@@ -945,12 +946,12 @@ def create_strategy(
         #     return 0.999
         # if param<4:
         #     return 0.99
-        if param<5:
-            return 0.8
-        elif param<20:
-            return 0.5
-        else:
-            return 0
+        # if param<5:
+        #     return 0.8
+        # elif param<20:
+        #     return 0.5
+        # else:
+        #     return 0
 
     # Generate tuples of next turn's boards and capture squares for one current board
     def populate_next_board_set(board_set: DefaultDict[str, float], my_color, pool=None, rc_disable_pbar: bool = False):
