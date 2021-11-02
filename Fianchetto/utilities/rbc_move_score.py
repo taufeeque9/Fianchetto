@@ -26,7 +26,7 @@ class ScoreConfig:
     search_depth: int = 8  # Stockfish engine search ply
     reward_attacker: float = 3.0  # Bonus points if move sets up attack on enemy king
     require_sneak: bool = True  # Only reward bonus points to aggressive moves if they are sneaky (aren't captures)
-    far_away_defense_score: float = 0.5 #Bonus points for protecting against check from far away with support (fads)
+    # far_away_defense_score: float = 0.5 #Bonus points for protecting against check from far away with support (fads)
     pawn_attack_score: float = 1.0
 
 def cp(Q):
@@ -169,16 +169,16 @@ def calculate_board_result(time_config, fian_color, score_config, board_epd_out)
             # print('getting from neural')
             raw_scores_rbc[i] = raw_scores_c.get(move, -2*abs(least_score))
 
-            if board.is_check():
-                king_attackers = board.attackers(not pov, board.king(pov))                         # list of squares/pieces that attack our king
-                for square in king_attackers:
-                    if ((board.piece_type_at(square)==chess.BISHOP) or (board.piece_type_at(square)==chess.ROOK) or (board.piece_type_at(square)==chess.QUEEN)):  # 3->Bishop, 4->Rook, 5->Queen
-                        support=next_board.attackers(pov,move.to_square)
-                        opposition=next_board.attackers(not pov,move.to_square)
-                        if len(list(support))>=len(list(opposition)):
-                            if chess.square_distance(move.to_square,board.king(pov))>2:
-                                raw_scores_rbc[i]+=score_config.far_away_defense_score
-                                break
+            # if board.is_check():
+            #     king_attackers = board.attackers(not pov, board.king(pov))                         # list of squares/pieces that attack our king
+            #     for square in king_attackers:
+            #         if ((board.piece_type_at(square)==chess.BISHOP) or (board.piece_type_at(square)==chess.ROOK) or (board.piece_type_at(square)==chess.QUEEN)):  # 3->Bishop, 4->Rook, 5->Queen
+            #             support=next_board.attackers(pov,move.to_square)
+            #             opposition=next_board.attackers(not pov,move.to_square)
+            #             if len(list(support))>=len(list(opposition)):
+            #                 if chess.square_distance(move.to_square,board.king(pov))>2:
+            #                     raw_scores_rbc[i]+=score_config.far_away_defense_score
+            #                     break
 
             # Add bonus board position score if king is attacked
             king_attackers = next_board.attackers(pov, next_board.king(not pov))  # list of pieces that can reach the enemy king
