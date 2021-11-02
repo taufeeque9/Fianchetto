@@ -357,18 +357,20 @@ def create_strategy(
     BSR_move_y2=100
 
     def BSR_factor_sense(board_set_size):
-        if board_set_size<=BSR_sense_x1:
-            return BSR_sense_y1
-        elif board_set_size>=BSR_sense_x2:
-            return BSR_sense_y2
-        else:
-            return BSR_sense_y1+((BSR_sense_y2-BSR_sense_y1)*((board_set_size-BSR_sense_x1)/(BSR_sense_x2-BSR_sense_x1)))
+        return 1
+        # if board_set_size<=BSR_sense_x1:
+        #     return BSR_sense_y1
+        # elif board_set_size>=BSR_sense_x2:
+        #     return BSR_sense_y2
+        # else:
+        #     return BSR_sense_y1+((BSR_sense_y2-BSR_sense_y1)*((board_set_size-BSR_sense_x1)/(BSR_sense_x2-BSR_sense_x1)))
 
     def BSR_factor_move(board_set_size):
-        if board_set_size<=BSR_move_x1:
-            return BSR_move_y1
-        else:
-            return BSR_move_y1+((BSR_move_y2-BSR_move_y1)*((board_set_size-BSR_move_x1)/(BSR_move_x2-BSR_move_x1)))
+        return 1
+        # if board_set_size<=BSR_move_x1:
+        #     return BSR_move_y1
+        # else:
+        #     return BSR_move_y1+((BSR_move_y2-BSR_move_y1)*((board_set_size-BSR_move_x1)/(BSR_move_x2-BSR_move_x1)))
 
 
     def sense_strategy(board_set: DefaultDict[str, float], our_color: bool,
