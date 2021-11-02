@@ -582,23 +582,23 @@ def create_strategy(
         #         mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
 ###################################################################################################################
-        majority_count=0
-        majority_square=-1
-        for square, count in king_squares.items():
-            if(count>majority_count):
-                majority_count=count
-                majority_square=square
-        if(majority_square>0):
-            if(majority_count>=(total_king_squares/2)):
-                if (chess.square_file(majority_square)==0):
-                    majority_square+=1
-                if (chess.square_file(majority_square)==7):
-                    majority_square-=1
-                if (chess.square_rank(majority_square)==0):
-                    majority_square+=8
-                if (chess.square_rank(majority_square)==7):
-                    majority_square-=8
-                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
+        # majority_count=0
+        # majority_square=-1
+        # for square, count in king_squares.items():
+        #     if(count>majority_count):
+        #         majority_count=count
+        #         majority_square=square
+        # if(majority_square>0):
+        #     if(majority_count>=(total_king_squares/2)):
+        #         if (chess.square_file(majority_square)==0):
+        #             majority_square+=1
+        #         if (chess.square_file(majority_square)==7):
+        #             majority_square-=1
+        #         if (chess.square_rank(majority_square)==0):
+        #             majority_square+=8
+        #         if (chess.square_rank(majority_square)==7):
+        #             majority_square-=8
+        #         mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
         # Also calculate the expected board set reduction for each sense square (scale from board sample to full set)
         expected_set_reduction = {
