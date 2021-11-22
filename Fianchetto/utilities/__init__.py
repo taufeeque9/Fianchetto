@@ -166,6 +166,7 @@ def push_move_to_epd(epd, move):
 
 def get_next_boards_and_capture_squares(w, all_b_m_len, board_epd_moves_prob_score):
     board_epd, moves, prob, score = board_epd_moves_prob_score
+    # print('score from gnb:', score)
     board = chess.Board(board_epd)
     # prob = board_set[all_boards[i][0]]  # accessing prob requires epd from our color's pov
 
@@ -183,7 +184,7 @@ def get_next_boards_and_capture_squares(w, all_b_m_len, board_epd_moves_prob_sco
         if next_board.was_into_check():
             unif_probs[i] = 1e-4
 
-    unif_probs[-1] += 0.5*expit((all_b_m_len-4500)/700)
+    # unif_probs[-1] += 0.5*expit((all_b_m_len-4500)/700)
     unif_probs /= np.sum(unif_probs)
 
 

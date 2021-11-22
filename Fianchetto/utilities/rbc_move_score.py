@@ -20,11 +20,11 @@ warnings.simplefilter("error", RuntimeWarning)
 # get better sneak rewards
 @dataclass
 class ScoreConfig:
-    capture_king_score: float = 200  # bonus points for a winning move
-    checkmate_score: int = 120  # point value of checkmate
-    into_check_score: float = -160  # point penalty for moving into check
+    capture_king_score: float = 50_000  # bonus points for a winning move
+    checkmate_score: int = 30_000  # point value of checkmate
+    into_check_score: float = -40_000  # point penalty for moving into check
     search_depth: int = 8  # Stockfish engine search ply
-    reward_attacker: float = 3.0  # Bonus points if move sets up attack on enemy king
+    reward_attacker: float = 300  # Bonus points if move sets up attack on enemy king
     require_sneak: bool = True  # Only reward bonus points to aggressive moves if they are sneaky (aren't captures)
     # far_away_defense_score: float = 0.5 #Bonus points for protecting against check from far away with support (fads)
     # pawn_attack_score: float = 1.0
@@ -117,7 +117,7 @@ def calculate_board_result(time_config, fian_color, score_config, board_epd_out)
 
     move_index = {m:i for i, m in enumerate(moves)}
 
-    # q = cp(q)
+    q = cp(q)
     game = GameState(fen=board_epd)
     # raw_scores_c =
     raw_scores_c = {map_uci(uci, board): score for uci, score in raw_score_c.items()}
@@ -153,7 +153,7 @@ def calculate_board_result(time_config, fian_color, score_config, board_epd_out)
             elif board.is_capture(move):
                 if board.piece_type_at(capture_square_of_move(board, move)) is chess.KING:
                     raw_scores_rbc[i] = score_config.capture_king_score
-                    q = score_config.capture_king_score*50
+                    q = score_config.capture_king_score
                     break
         elif move == chess.Move.null():
             continue

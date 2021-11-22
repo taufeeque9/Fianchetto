@@ -109,8 +109,8 @@ def create_strategy(
         score_config: ScoreConfig = ScoreConfig(),
         time_config: TimeConfig = TimeConfig(),
 
-        board_weight_90th_percentile: float = 1000,
-        boards_per_centipawn: int = 800,
+        board_weight_90th_percentile: float = 5000,
+        boards_per_centipawn: int = 30,
         num_workers: int = 1,
         num_threads: int = None,
 
@@ -179,6 +179,7 @@ def create_strategy(
 
     # Convert a board strength score into a probability for use in weighted averages (here using the logistic function)
     def weight_board_probability(score):
+        # print('score:', score)
         return 1 / (1 + np.exp(-2 * np.log(3) / board_weight_90th_percentile * score))
 
     # If requested, pre-load the board/move score cache from a file
@@ -426,8 +427,8 @@ def create_strategy(
         king_locations = defaultdict(lambda: defaultdict(set))
 
         # Get a random sampling of boards from the board set
-        # board_sample = cache_favored_random_sample(board_set, sample_size)
-        board_sample = prob_random_sample(board_set, sample_size)
+        board_sample = cache_favored_random_sample(board_set, sample_size)
+        # board_sample = prob_random_sample(board_set, sample_size)
         # Initialize arrays for board and move data (dictionaries work here, too, but arrays were faster)
         board_sample_weights = np.zeros(len(board_sample))
         move_scores = np.zeros([len(moves), len(board_sample)])
@@ -482,9 +483,9 @@ def create_strategy(
             # print('results:', board_score_dict[make_cache_key(board)])
             my_score, all_moves_score = board_score_dict[board_epd_p]
             my_score_sum += my_score
-            # op_score = -my_score #assumption
-            # board_sample_weights[num_board] = weight_board_probability(op_score)
-            board_sample_weights[num_board] = board_prob
+            op_score = -my_score #assumption
+            board_sample_weights[num_board] = weight_board_probability(op_score)
+            # board_sample_weights[num_board] = board_prob
             total_weighted_probability += board_sample_weights[num_board]
 
             # board.turn = our_color
@@ -705,9 +706,9 @@ def create_strategy(
         #         return 1
         #     else:
         #         return -(board_score_dict[make_cache_key(board)][0])
-        # board_sample_weights = softmax([check_score_wrapper(board) for board in board_sample])
+        # board_weight_arr = softmax([check_score_wrapper(board) for board in board_sample])
         bet = time()-t0
-        move_scores = np.zeros([len(moves), len(board_sample)])
+        # move_scores = np.zeros([len(moves), len(board_sample)])
         board_weight_arr = np.zeros(len(board_sample))
 
         for num_board, (board_epd, board_weight) in enumerate(tqdm(board_sample.items(), disable=rc_disable_pbar,
@@ -717,9 +718,9 @@ def create_strategy(
 
             board.turn = our_color
             my_score, all_moves_score = board_score_dict[make_cache_key(board)]
-            # op_score = -my_score
-            # board_weight = weight_board_probability(op_score)
-            # total_weighted_probability += board_weight
+            op_score = -my_score
+            board_weight = weight_board_probability(op_score)
+            total_weighted_probability += board_weight
             board_weight_arr[num_board] = board_weight
 
             # board.turn = our_color
@@ -731,11 +732,11 @@ def create_strategy(
             # move_scores[:, num_board] = all_moves_prob
 
             # Gather scores and information about move results for each requested move on each board
-            move_scores[:, num_board] = all_moves_score
-            # for it, move in enumerate(moves):
-            #     score = all_moves_score[it]
-            #     move_scores[move].append(score)
-            #     weighted_sum_move_scores[move] += score * board_weight
+            # move_scores[:, num_board] = all_moves_score
+            for it, move in enumerate(moves):
+                score = all_moves_score[it]
+                move_scores[move].append(score)
+                weighted_sum_move_scores[move] += score * board_weight
 
                 # sim_move = simulate_move(board, move) or chess.Move.null()
                 # move_result = (sim_move, board.is_capture(sim_move))
@@ -744,14 +745,14 @@ def create_strategy(
                 # weighted_probability[move][move_result] += board_weight
 
         # Combine the mean, min, and max possible scores based on config settings
-        # compound_score = {move: (
-        #     weighted_sum_move_scores[move] / total_weighted_probability * move_config.mean_score_factor +
-        #     min(scores) * move_config.min_score_factor +
-        #     max(scores) * move_config.max_score_factor
-        # ) for (move, scores) in move_scores.items()}
+        compound_score = {move: (
+            weighted_sum_move_scores[move] / total_weighted_probability * move_config.mean_score_factor +
+            min(scores) * move_config.min_score_factor +
+            max(scores) * move_config.max_score_factor
+        ) for (move, scores) in move_scores.items()}
         # board_weight_arr /= np.sum(board_weight_arr)
-        compound_score = move_config.mean_score_factor * np.average(move_scores, axis=-1, weights=board_weight_arr) \
-                       + move_config.min_score_factor * np.min(move_scores, axis=-1)
+        # compound_score = move_config.mean_score_factor * np.average(move_scores, axis=-1, weights=board_weight_arr) \
+        #                + move_config.min_score_factor * np.min(move_scores, axis=-1)
 
 
         store[-1]['#boards'] = len(board_set)
@@ -771,7 +772,7 @@ def create_strategy(
         #                       for move, score in compound_score.items()}
 
         # Determine the minimum score a move needs to be considered
-        highest_score = np.max(compound_score)
+        highest_score = max(compound_score.values())
         threshold_score = highest_score - abs(highest_score) * move_config.threshold_score_factor
         # print(highest_score, threshold_score)
         # threshold_score = highest_score * move_config.threshold_score_factor
@@ -779,7 +780,8 @@ def create_strategy(
 
         # Create a list of all moves which scored above the threshold
         # store[-1]['compound_score'] = {k:v for k, v in compound_score.items() if v >= threshold_score}
-        move_options = [move for move, score in zip(moves, compound_score) if score >= threshold_score]
+        # move_options = [move for move, score in zip(moves, compound_score) if score >= threshold_score]
+        move_options = [move for move, score in compound_score.items() if score >= threshold_score]
         # print(store[-1]['compound_score'])
         # # Eliminate move options which we know to be illegal (mainly for replay clarity)
         # move_options = [move for move in move_options
@@ -936,7 +938,7 @@ def create_strategy(
     #     return next_turn_boards
 
     def get_weight_for_scoring(board_set_size):
-        return 1
+        return 0
         # weight returned should never be 1
         # return 0.5
         # param=int(board_set_size/1_000)
