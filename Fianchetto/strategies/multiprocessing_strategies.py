@@ -26,6 +26,8 @@ Qs = []
 msi = []
 esr = []
 msr = []
+las = []
+laom = []
 
 # logger = mp.log_to_stderr()
 # logger.setLevel(mp.SUBDEBUG)
@@ -357,18 +359,20 @@ def create_strategy(
     BSR_move_y2=100
 
     def BSR_factor_sense(board_set_size):
-        if board_set_size<=BSR_sense_x1:
-            return BSR_sense_y1
-        elif board_set_size>=BSR_sense_x2:
-            return BSR_sense_y2
-        else:
-            return BSR_sense_y1+((BSR_sense_y2-BSR_sense_y1)*((board_set_size-BSR_sense_x1)/(BSR_sense_x2-BSR_sense_x1)))
+        return 1
+        # if board_set_size<=BSR_sense_x1:
+        #     return BSR_sense_y1
+        # elif board_set_size>=BSR_sense_x2:
+        #     return BSR_sense_y2
+        # else:
+        #     return BSR_sense_y1+((BSR_sense_y2-BSR_sense_y1)*((board_set_size-BSR_sense_x1)/(BSR_sense_x2-BSR_sense_x1)))
 
     def BSR_factor_move(board_set_size):
-        if board_set_size<=BSR_move_x1:
-            return BSR_move_y1
-        else:
-            return BSR_move_y1+((BSR_move_y2-BSR_move_y1)*((board_set_size-BSR_move_x1)/(BSR_move_x2-BSR_move_x1)))
+        return 1
+        # if board_set_size<=BSR_move_x1:
+        #     return BSR_move_y1
+        # else:
+        #     return BSR_move_y1+((BSR_move_y2-BSR_move_y1)*((board_set_size-BSR_move_x1)/(BSR_move_x2-BSR_move_x1)))
 
 
     def sense_strategy(board_set: DefaultDict[str, float], our_color: bool,
@@ -394,6 +398,8 @@ def create_strategy(
         global msr
         global move_ind
         global store
+        global laom
+        laom.append(len(board_set))
         move_ind += 1
         global msi, esr
         # print('movelist')
@@ -652,6 +658,8 @@ def create_strategy(
         global msr
         global move_ind
         global store
+        global las
+        las.append(len(board_set))
         # move_ind += 1
         store.append({})
         # Allocate remaining time and use that to determine the sample_size for this turn
@@ -853,7 +861,7 @@ def create_strategy(
             else:
                 sleep(0.001)
 
-    def end_game():
+    def end_game(game_id, game_history, our_color):
         """
         Quit the StockFish engine instance(s) associated with this strategy once the game is over.
         """
@@ -862,10 +870,22 @@ def create_strategy(
         global msr
         global store
         # np.save('qarr.npy', Qs)
-        np.save('msi', msi)
-        np.save('esr', esr)
-        np.save('msr', msr)
-        np.save('store', store)
+        game_history.game_id = game_id
+        game_history.our_color = our_color
+        game_history.las = las
+        game_history.laom = laom
+
+        game_history.save(f'v3games/{game_id}.json')
+        dict = {'white': game_history._white_name, 'black': game_history._black_name, 'las': las, 'laom': laom, 'game_id': game_id}
+                    # 'lasw': lasw, 'lasb': lasb, 'laomw': laomw, 'laomb': laomb, 'game_id': game_id}
+
+        np.save(f'v3games/{game_id}.bs2', dict)
+
+
+        # np.save('msi', msi)
+        # np.save('esr', esr)
+        # np.save('msr', msr)
+        # np.save('store', store)
         logger.debug("During this game, averaged %.5f seconds per score using batch size %d",
                      calc_time_per_eval(), time_config.max_batch)
 
@@ -934,9 +954,10 @@ def create_strategy(
     #     return next_turn_boards
 
     def get_weight_for_scoring(board_set_size):
+        return 1
         # weight returned should never be 1
         # return 0.5
-        param=int(board_set_size/1_000)
+        # param=int(board_set_size/1_000)
         # if param<1:
         #     return 0.99999
         # elif param<2:
@@ -945,12 +966,12 @@ def create_strategy(
         #     return 0.999
         # if param<4:
         #     return 0.99
-        if param<5:
-            return 0.8
-        elif param<20:
-            return 0.5
-        else:
-            return 0
+        # if param<5:
+        #     return 0.8
+        # elif param<20:
+        #     return 0.5
+        # else:
+        #     return 0
 
     # Generate tuples of next turn's boards and capture squares for one current board
     def populate_next_board_set(board_set: DefaultDict[str, float], my_color, pool=None, rc_disable_pbar: bool = False):
