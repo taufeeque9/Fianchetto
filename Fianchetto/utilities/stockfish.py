@@ -1,7 +1,7 @@
 import os
 
 import chess.engine
-from lczero.backends import Weights, Backend, GameState
+from lczero.backends import Weights, Backend, GameState, LczeroException
 # make sure stockfish environment variable exists
 if "STOCKFISH_EXECUTABLE" not in os.environ:
     raise KeyError('This bot requires an environment variable called "STOCKFISH_EXECUTABLE"'
@@ -17,5 +17,8 @@ def create_engine(max_batch, gpu_id):
     w = Weights('weights_run3_752050.pb.gz')
     # w = Weights('LS15_20x256SE_jj_9_75000000.pb.gz')
 #    w = Weights('weights_run1_610024.pb.gz')
-    b = Backend(weights=w, backend='cuda-fp16', options=f'max_batch={max_batch}, gpu={gpu_id}')
+    try:
+        b = Backend(weights=w, backend='cuda-fp16', options=f'max_batch={max_batch}, gpu={gpu_id}')
+    except LczeroException:
+        b = Backend(weights=w, backend='cuda', options=f'max_batch={max_batch}, gpu={gpu_id}')
     return b
