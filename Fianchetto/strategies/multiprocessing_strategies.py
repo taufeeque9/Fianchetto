@@ -46,7 +46,7 @@ class TimeConfig:
     min_time_for_turn: float = 1.0  # minimum time to allocate for a turn
     time_for_sense: float = 0.8  # fraction of turn spent in choose_sense
     time_for_move: float = 0.2  # fraction of turn spent in choose_move
-    max_batch: int = 32
+    max_batch: int = 1024
     num_boards_per_sec: int = 800 #per process
     calc_time_per_board: float = (2/num_boards_per_sec)  # starting time estimate for move score calculation
     board_limit_for_belief: int = num_boards_per_sec*20
