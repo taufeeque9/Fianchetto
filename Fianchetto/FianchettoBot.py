@@ -322,8 +322,8 @@ class FianchettoBot(Player):
                 self._while_we_wait(self.next_turn_boards_unsorted, self.color)
 
     def handle_game_end(self, winner_color: Optional[Color], win_reason: Optional[WinReason], game_history: GameHistory
-                        , game_id):
+                        ):
         self.logger.info('I %s by %s', "won" if winner_color == self.color else "lost",
                          win_reason.name if hasattr(win_reason, "name") else win_reason)
         self.pool.terminate()
-        self._end_game(game_id, game_history, self.color)
+        self._end_game()

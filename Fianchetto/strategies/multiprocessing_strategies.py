@@ -26,8 +26,7 @@ Qs = []
 msi = []
 esr = []
 msr = []
-las = []
-laom = []
+
 # logger = mp.log_to_stderr()
 # logger.setLevel(mp.SUBDEBUG)
 
@@ -395,8 +394,6 @@ def create_strategy(
         global msr
         global move_ind
         global store
-        global laom
-        laom.append(len(board_set))
         move_ind += 1
         global msi, esr
         # print('movelist')
@@ -446,12 +443,12 @@ def create_strategy(
             board_score_reqs[board.epd(en_passant='xfen')] = moves
         board_score_dict = memo_calc_set(board_score_reqs, our_color, pool)
 ###################################################################################################################
-        # queen_squares = defaultdict(float)
-        # total_queen_squares = 0
+        queen_squares = defaultdict(float)
+        total_queen_squares = 0
 ###################################################################################################################
 ###################################################################################################################
-        # king_squares = defaultdict(float)
-        # total_king_squares = 0
+        king_squares = defaultdict(float)
+        total_king_squares = 0
 ###################################################################################################################
         # board_sample_weights = softmax([-(board_score_dict[make_cache_key(board)][0]) for board in board_sample])
         bet = time()-t0
@@ -465,20 +462,20 @@ def create_strategy(
             board.turn = our_color
             board_epd_p = make_cache_key(board)
 ###################################################################################################################
-            # opp_queen=board.pieces(chess.QUEEN, not our_color)
-            # for square in opp_queen:
-            #     attacks_queen=board.attackers(our_color,square)
-            #     if len(attacks_queen)>0:
-            #         queen_squares[square]+=1
-            #     total_queen_squares+=1
+            opp_queen=board.pieces(chess.QUEEN, not our_color)
+            for square in opp_queen:
+                attacks_queen=board.attackers(our_color,square)
+                if len(attacks_queen)>0:
+                    queen_squares[square]+=1
+                total_queen_squares+=1
 ###################################################################################################################
 ###################################################################################################################
-            # opp_king=board.pieces(chess.KING, not our_color)
-            # for square in opp_king:
-            #     attacks_king=board.attackers(our_color,square)
-            #     if len(attacks_king)>0:
-            #         king_squares[square]+=1
-            #     total_king_squares+=1
+            opp_king=board.pieces(chess.KING, not our_color)
+            for square in opp_king:
+                attacks_king=board.attackers(our_color,square)
+                if len(attacks_king)>0:
+                    king_squares[square]+=1
+                total_king_squares+=1
 ###################################################################################################################
             # print('results:', board_score_dict[make_cache_key(board)])
             my_score, all_moves_score = board_score_dict[board_epd_p]
@@ -566,42 +563,42 @@ def create_strategy(
             for square in SEARCH_SPOTS
         }
 ###################################################################################################################
-        # majority_count=0
-        # majority_square=-1
-        # for square, count in queen_squares.items():
-        #     if(count>majority_count):
-        #         majority_count=count
-        #         majority_square=square
-        # if(majority_square>0):
-        #     if(majority_count>=(total_queen_squares/2)):
-        #         if (chess.square_file(majority_square)==0):
-        #             majority_square+=1
-        #         if (chess.square_file(majority_square)==7):
-        #             majority_square-=1
-        #         if (chess.square_rank(majority_square)==0):
-        #             majority_square+=8
-        #         if (chess.square_rank(majority_square)==7):
-        #             majority_square-=8
-        #         mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
+        majority_count=0
+        majority_square=-1
+        for square, count in queen_squares.items():
+            if(count>majority_count):
+                majority_count=count
+                majority_square=square
+        if(majority_square>0):
+            if(majority_count>=(total_queen_squares/2)):
+                if (chess.square_file(majority_square)==0):
+                    majority_square+=1
+                if (chess.square_file(majority_square)==7):
+                    majority_square-=1
+                if (chess.square_rank(majority_square)==0):
+                    majority_square+=8
+                if (chess.square_rank(majority_square)==7):
+                    majority_square-=8
+                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
 ###################################################################################################################
-        # majority_count=0
-        # majority_square=-1
-        # for square, count in king_squares.items():
-        #     if(count>majority_count):
-        #         majority_count=count
-        #         majority_square=square
-        # if(majority_square>0):
-        #     if(majority_count>=(total_king_squares/2)):
-        #         if (chess.square_file(majority_square)==0):
-        #             majority_square+=1
-        #         if (chess.square_file(majority_square)==7):
-        #             majority_square-=1
-        #         if (chess.square_rank(majority_square)==0):
-        #             majority_square+=8
-        #         if (chess.square_rank(majority_square)==7):
-        #             majority_square-=8
-        #         mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
+        majority_count=0
+        majority_square=-1
+        for square, count in king_squares.items():
+            if(count>majority_count):
+                majority_count=count
+                majority_square=square
+        if(majority_square>0):
+            if(majority_count>=(total_king_squares/2)):
+                if (chess.square_file(majority_square)==0):
+                    majority_square+=1
+                if (chess.square_file(majority_square)==7):
+                    majority_square-=1
+                if (chess.square_rank(majority_square)==0):
+                    majority_square+=8
+                if (chess.square_rank(majority_square)==7):
+                    majority_square-=8
+                mean_sense_impact[majority_square]+=(abs((min(max(mean_sense_impact.values()),40)-(mean_sense_impact[majority_square])))*(6/10))
 ###################################################################################################################
         # Also calculate the expected board set reduction for each sense square (scale from board sample to full set)
         expected_set_reduction = {
@@ -655,8 +652,6 @@ def create_strategy(
         global msr
         global move_ind
         global store
-        global las
-        las.append(len(board_set))
         # move_ind += 1
         store.append({})
         # Allocate remaining time and use that to determine the sample_size for this turn
@@ -858,7 +853,7 @@ def create_strategy(
             else:
                 sleep(0.001)
 
-    def end_game(game_id, game_history, our_color):
+    def end_game():
         """
         Quit the StockFish engine instance(s) associated with this strategy once the game is over.
         """
@@ -871,14 +866,6 @@ def create_strategy(
         np.save('esr', esr)
         np.save('msr', msr)
         np.save('store', store)
-
-        game_history.save(f'v3games/{game_id}.json')
-        dict = {'white': game_history._white_name, 'black': game_history._black_name, 'las': las, 'laom': laom, 'game_id': game_id}
-                    # 'lasw': lasw, 'lasb': lasb, 'laomw': laomw, 'laomb': laomb, 'game_id': game_id}
-
-        np.save(f'v3games/{game_id}.bs2', dict)
-
-
         logger.debug("During this game, averaged %.5f seconds per score using batch size %d",
                      calc_time_per_eval(), time_config.max_batch)
 

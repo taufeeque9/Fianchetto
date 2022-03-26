@@ -69,7 +69,7 @@ def our_play_remote_game(server_url, game_id, auth, player: Player):
 
     logger.debug("Ending remote game %d against %s.", game_id, op_name)
 
-    player.handle_game_end(winner_color, win_reason, game_history, game_id)
+    player.handle_game_end(winner_color, win_reason, game_history)
 
     return winner_color, win_reason, game_history
 
